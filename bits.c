@@ -334,18 +334,23 @@ int midpointTowardFirst(int x, int y) {
  */
 // P12
 int isBetweenEitherOrder(int x, int a, int b) {
-  int ua = a + (1 << 31);
-  int ub = b + (1 << 31);
-  int ux = x + (1 << 31);
-  int a_le_b = !((ua + (~ub + 1)) >> 31);
-  int b_le_a = !((ub + (~ua + 1)) >> 31);
-  int x_ge_a = !((ua + (~ux + 1)) >> 31);
-  int x_le_b = !((ux + (~ub + 1)) >> 31);
-  int x_ge_b = !((ub + (~ux + 1)) >> 31);
-  int x_le_a = !((ux + (~ua + 1)) >> 31);
-  int cond1 = a_le_b & x_ge_a & x_le_b;
-  int cond2 = b_le_a & x_ge_b & x_le_a;
-  return cond1 | cond2;
+  int sx = x >> 31;
+  int sa = a >> 31;
+  int sb = b >> 31;
+
+  int xMinusA = x + (~a + 1);
+  int xMinusB = x + (~b + 1);
+  int bMinusX = b + (~x + 1);
+  int aMinusX = a + (~x + 1);
+
+  int xLessA = (sx & ~sa) | (~(sx ^ sa) & (xMinusA >> 31));
+  int xLessB = (sx & ~sb) | (~(sx ^ sb) & (xMinusB >> 31));
+  int bLessX = (sb & ~sx) | (~(sb ^ sx) & (bMinusX >> 31));
+  int aLessX = (sa & ~sx) | (~(sa ^ sx) & (aMinusX >> 31));
+
+  int inAB = !(xLessA | bLessX);
+  int inBA = !(xLessB | aLessX);
+  return inAB | inBA;
 }
 // P13
 /* 
@@ -383,15 +388,24 @@ int mul5Sat(int x) {
  */
 // P14
 int classifyAdd3(int x, int y, int z) {
-  int s1 = x + y;
-  int s2 = s1 + z;
-  int high = (x>>31) + (y>>31) + (z>>31) + 
-             (((x & y) | ((x | y) & ~s1)) >> 31 & 1) + 
-             (((s1 & z) | ((s1 | z) & ~s2)) >> 31 & 1);
-  int pos_ov = (~(high>>31)) & !!high;
-  int is_int_min = !(s2 ^ (1 << 31));
-  int neg_ov = (high >> 31) & (is_int_min + ~0);
-  return (pos_ov & 1) | neg_ov;
+  int sx = x >> 31;
+  int sy = y >> 31;
+  int sz = z >> 31;
+  int magnitudeMask = ~(1 << 31);
+  int absX = x & magnitudeMask;
+  int absY = y & magnitudeMask;
+  int absZ = z & magnitudeMask;
+
+  int first = absX + absY;
+  int carryFirst = (first >> 31) & 1;
+  int lowSum = first & magnitudeMask;
+  int second = lowSum + absZ;
+  int carrySecond = (second >> 31) & 1;
+
+  int signTotal = sx + sy + sz + carryFirst + carrySecond;
+  int positiveOverflow = (~(signTotal >> 31)) & !!signTotal;
+  int negativeOverflow = (signTotal + 1) >> 31;
+  return (positiveOverflow & 1) | negativeOverflow;
 }
 
 // P15
@@ -594,6 +608,7 @@ int bitReverse(int x) {
   x = ((x >> 2) & m2) | ((x & m2) << 2);
   x = ((x >> 4) & m3) | ((x & m3) << 4);
   x = ((x >> 8) & m4) | ((x & m4) << 8);
-  x = (x >> 16) | (x << 16);
+  int halfWordMask = 0xFF | (0xFF << 8);
+  x = ((x >> 16) & halfWordMask) | (x << 16);
   return x;
 }
